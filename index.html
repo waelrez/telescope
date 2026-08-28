@@ -1,0 +1,142 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REZ Telescope VM</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="topbar">
+  <div class="brand">🔭 REZ TELESCOPE VM</div>
+  <div class="status">
+    <span class="dot"></span>
+    SIMULATOR ONLINE
+  </div>
+</header>
+
+<main class="dashboard">
+
+  <section class="sky-panel">
+    <div class="panel-title">
+      <span>🌌 SKY MAP</span>
+      <span id="skyTime">--:--:--</span>
+    </div>
+
+    <canvas id="skyMap"></canvas>
+
+    <div class="coordinates">
+      <div>
+        <small>RA</small>
+        <strong id="ra">12h 00m 00s</strong>
+      </div>
+
+      <div>
+        <small>DEC</small>
+        <strong id="dec">+00° 00′ 00″</strong>
+      </div>
+
+      <div>
+        <small>AZ</small>
+        <strong id="az">180.0°</strong>
+      </div>
+
+      <div>
+        <small>ALT</small>
+        <strong id="alt">45.0°</strong>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="camera-panel">
+
+    <div class="panel-title">
+      <span>📷 LIVE CAMERA</span>
+      <span class="camera-online">● ONLINE</span>
+    </div>
+
+    <div class="camera">
+      <canvas id="camera"></canvas>
+      <div class="crosshair"></div>
+      <div class="camera-info">
+        SIMULATED CCD<br>
+        EXPOSURE: 2.5s
+      </div>
+    </div>
+
+  </section>
+
+
+  <section class="controls-panel">
+
+    <div class="panel-title">🔭 TELESCOPE CONTROL</div>
+
+    <div class="joystick">
+
+      <button onclick="move('up')">▲</button>
+
+      <div>
+        <button onclick="move('left')">◀</button>
+        <button class="stop" onclick="stopTelescope()">■</button>
+        <button onclick="move('right')">▶</button>
+      </div>
+
+      <button onclick="move('down')">▼</button>
+
+    </div>
+
+    <div class="control-buttons">
+      <button onclick="gotoObject('Moon')">🌙 MOON</button>
+      <button onclick="gotoObject('Mars')">🔴 MARS</button>
+      <button onclick="gotoObject('Jupiter')">🟠 JUPITER</button>
+      <button onclick="gotoObject('Andromeda')">🌌 ANDROMEDA</button>
+    </div>
+
+    <div class="actions">
+      <button onclick="tracking()">TRACKING</button>
+      <button onclick="stopTelescope()">STOP</button>
+    </div>
+
+  </section>
+
+
+  <section class="system-panel">
+
+    <div class="panel-title">SYSTEM STATUS</div>
+
+    <div class="system-grid">
+
+      <div>
+        <span>Telescope</span>
+        <b class="green">ONLINE</b>
+      </div>
+
+      <div>
+        <span>Camera</span>
+        <b class="green">ONLINE</b>
+      </div>
+
+      <div>
+        <span>Tracking</span>
+        <b id="trackingStatus">OFF</b>
+      </div>
+
+      <div>
+        <span>Mode</span>
+        <b>SIMULATION</b>
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
+```
