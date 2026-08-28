@@ -1,262 +1,823 @@
 ```javascript
-const sky = document.getElementById("skyMap");
-const skyCtx = sky.getContext("2d");
-
-const camera = document.getElementById("camera");
-const cameraCtx = camera.getContext("2d");
+/* =========================================================
+   REZ TELESCOPE VM V2 PRO
+   Main Simulator Engine
+   ========================================================= */
 
 let telescope = {
-  ra: 12,
-  dec: 0,
-  az: 180,
-  alt: 45,
+  ra: 12.0,
+  dec: 0.0,
+  az: 180.0,
+  alt: 45.0,
+
+  target: "Deep Sky",
   tracking: false,
-  target: "Deep Sky"
+  moving: false,
+
+  zoom: 1
 };
 
 let stars = [];
+let animationFrame;
+
+
+/* =========================================================
+   CANVAS
+   ========================================================= */
+
+const skyCanvas = document.getElementById("skyMap");
+const skyCtx = skyCanvas.getContext("2d");
+
+const cameraCanvas = document.getElementById("camera");
+const cameraCtx = cameraCanvas.getContext("2d");
+
 
 function resizeCanvas() {
-  const skyRect = sky.getBoundingClientRect();
-  sky.width = skyRect.width * devicePixelRatio;
-  sky.height = skyRect.height * devicePixelRatio;
-  skyCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
 
-  const camRect = camera.getBoundingClientRect();
-  camera.width = camRect.width * devicePixelRatio;
-  camera.height = camRect.height * devicePixelRatio;
-  cameraCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const skyRect = skyCanvas.getBoundingClientRect();
+
+  skyCanvas.width = skyRect.width * devicePixelRatio;
+  skyCanvas.height = skyRect.height * devicePixelRatio;
+
+  skyCtx.setTransform(
+    devicePixelRatio,
+    0,
+    0,
+    devicePixelRatio,
+    0,
+    0
+  );
+
+
+  const cameraRect = cameraCanvas.getBoundingClientRect();
+
+  cameraCanvas.width = cameraRect.width * devicePixelRatio;
+  cameraCanvas.height = cameraRect.height * devicePixelRatio;
+
+  cameraCtx.setTransform(
+    devicePixelRatio,
+    0,
+    0,
+    devicePixelRatio,
+    0,
+    0
+  );
 }
 
-function createStars() {
+
+/* =========================================================
+   STAR FIELD
+   ========================================================= */
+
+function generateStars() {
+
   stars = [];
 
-  const rect = sky.getBoundingClientRect();
+  const rect = skyCanvas.getBoundingClientRect();
 
-  for (let i = 0; i < 220; i++) {
+  for (let i = 0; i < 320; i++) {
+
     stars.push({
+
       x: Math.random() * rect.width,
+
       y: Math.random() * rect.height,
-      r: Math.random() * 1.7 + 0.2,
-      a: Math.random() * .8 + .2
+
+      size: Math.random() * 1.8 + 0.2,
+
+      brightness: Math.random() * 0.8 + 0.2,
+
+      twinkle: Math.random() * Math.PI * 2
+
     });
+
   }
 }
 
-function drawSky() {
-  const rect = sky.getBoundingClientRect();
 
-  skyCtx.clearRect(0, 0, rect.width, rect.height);
+/* =========================================================
+   SKY MAP
+   ========================================================= */
 
-  const gradient = skyCtx.createRadialGradient(
-    rect.width / 2,
-    rect.height / 2,
-    10,
-    rect.width / 2,
-    rect.height / 2,
-    rect.width
+function drawSkyMap() {
+
+  const rect = skyCanvas.getBoundingClientRect();
+
+  const width = rect.width;
+  const height = rect.height;
+
+  skyCtx.clearRect(0, 0, width, height);
+
+
+  /* Background */
+
+  const background =
+    skyCtx.createRadialGradient(
+      width / 2,
+      height / 2,
+      10,
+      width / 2,
+      height / 2,
+      width
+    );
+
+  background.addColorStop(0, "#10233d");
+  background.addColorStop(0.55, "#050d1a");
+  background.addColorStop(1, "#01040a");
+
+  skyCtx.fillStyle = background;
+
+  skyCtx.fillRect(
+    0,
+    0,
+    width,
+    height
   );
 
-  gradient.addColorStop(0, "#12233c");
-  gradient.addColorStop(1, "#02050b");
 
-  skyCtx.fillStyle = gradient;
-  skyCtx.fillRect(0, 0, rect.width, rect.height);
+  /* Stars */
+
+  const now = performance.now();
 
   for (const star of stars) {
+
+    const twinkle =
+      Math.sin(now / 600 + star.twinkle) * 0.15;
+
+    const alpha =
+      Math.max(
+        0.1,
+        star.brightness + twinkle
+      );
+
     skyCtx.beginPath();
-    skyCtx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-    skyCtx.fillStyle = `rgba(255,255,255,${star.a})`;
+
+    skyCtx.arc(
+      star.x,
+      star.y,
+      star.size * telescope.zoom,
+      0,
+      Math.PI * 2
+    );
+
+    skyCtx.fillStyle =
+      `rgba(255,255,255,${alpha})`;
+
     skyCtx.fill();
+
   }
 
-  // Horizon
-  skyCtx.strokeStyle = "rgba(100,150,210,.15)";
+
+  /* Grid */
+
+  skyCtx.strokeStyle =
+    "rgba(90,150,220,.10)";
+
+  skyCtx.lineWidth = 1;
+
+
+  for (let x = 0; x < width; x += 60) {
+
+    skyCtx.beginPath();
+
+    skyCtx.moveTo(x, 0);
+    skyCtx.lineTo(x, height);
+
+    skyCtx.stroke();
+
+  }
+
+
+  for (let y = 0; y < height; y += 60) {
+
+    skyCtx.beginPath();
+
+    skyCtx.moveTo(0, y);
+    skyCtx.lineTo(width, y);
+
+    skyCtx.stroke();
+
+  }
+
+
+  /* Center target */
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+
   skyCtx.beginPath();
-  skyCtx.moveTo(0, rect.height / 2);
-  skyCtx.lineTo(rect.width, rect.height / 2);
-  skyCtx.stroke();
 
-  // Telescope target
-  const x = rect.width / 2;
-  const y = rect.height / 2;
-
-  skyCtx.beginPath();
-  skyCtx.arc(x, y, 8, 0, Math.PI * 2);
-  skyCtx.strokeStyle = "#67a9ff";
-  skyCtx.stroke();
-
-  skyCtx.fillStyle = "#67a9ff";
-  skyCtx.font = "11px Arial";
-  skyCtx.fillText(telescope.target, x + 13, y - 12);
-}
-
-function drawCamera() {
-  const rect = camera.getBoundingClientRect();
-
-  cameraCtx.clearRect(0, 0, rect.width, rect.height);
-
-  cameraCtx.fillStyle = "#010204";
-  cameraCtx.fillRect(0, 0, rect.width, rect.height);
-
-  // Simulated nebula
-  const nebula = cameraCtx.createRadialGradient(
-    rect.width / 2,
-    rect.height / 2,
+  skyCtx.arc(
+    centerX,
+    centerY,
     10,
-    rect.width / 2,
-    rect.height / 2,
-    180
+    0,
+    Math.PI * 2
   );
 
-  nebula.addColorStop(0, "rgba(150,170,255,.35)");
-  nebula.addColorStop(.35, "rgba(80,100,190,.18)");
-  nebula.addColorStop(1, "rgba(0,0,0,0)");
+  skyCtx.strokeStyle =
+    "#58a6ff";
 
-  cameraCtx.fillStyle = nebula;
-  cameraCtx.fillRect(0, 0, rect.width, rect.height);
+  skyCtx.stroke();
 
-  // Stars
-  for (let i = 0; i < 100; i++) {
-    const x = Math.random() * rect.width;
-    const y = Math.random() * rect.height;
-    const r = Math.random() * 1.3;
+
+  skyCtx.beginPath();
+
+  skyCtx.moveTo(
+    centerX - 22,
+    centerY
+  );
+
+  skyCtx.lineTo(
+    centerX + 22,
+    centerY
+  );
+
+  skyCtx.moveTo(
+    centerX,
+    centerY - 22
+  );
+
+  skyCtx.lineTo(
+    centerX,
+    centerY + 22
+  );
+
+  skyCtx.strokeStyle =
+    "rgba(88,166,255,.7)";
+
+  skyCtx.stroke();
+
+
+  /* Target label */
+
+  skyCtx.fillStyle =
+    "#8fc4ff";
+
+  skyCtx.font =
+    "11px Arial";
+
+  skyCtx.fillText(
+    telescope.target,
+    centerX + 16,
+    centerY - 15
+  );
+
+}
+
+
+/* =========================================================
+   CAMERA SIMULATOR
+   ========================================================= */
+
+function drawCamera() {
+
+  const rect =
+    cameraCanvas.getBoundingClientRect();
+
+  const width = rect.width;
+  const height = rect.height;
+
+  cameraCtx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  /* Black sensor */
+
+  cameraCtx.fillStyle = "#000";
+
+  cameraCtx.fillRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  /* Simulated glow */
+
+  const glow =
+    cameraCtx.createRadialGradient(
+      width / 2,
+      height / 2,
+      5,
+      width / 2,
+      height / 2,
+      190
+    );
+
+  glow.addColorStop(
+    0,
+    "rgba(180,205,255,.35)"
+  );
+
+  glow.addColorStop(
+    .3,
+    "rgba(80,120,220,.18)"
+  );
+
+  glow.addColorStop(
+    1,
+    "rgba(0,0,0,0)"
+  );
+
+  cameraCtx.fillStyle = glow;
+
+  cameraCtx.fillRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  /* Camera stars */
+
+  for (let i = 0; i < 140; i++) {
+
+    const x =
+      Math.random() * width;
+
+    const y =
+      Math.random() * height;
+
+    const radius =
+      Math.random() * 1.4;
 
     cameraCtx.beginPath();
-    cameraCtx.arc(x, y, r, 0, Math.PI * 2);
-    cameraCtx.fillStyle = "rgba(255,255,255,.8)";
+
+    cameraCtx.arc(
+      x,
+      y,
+      radius,
+      0,
+      Math.PI * 2
+    );
+
+    cameraCtx.fillStyle =
+      "rgba(255,255,255,.75)";
+
     cameraCtx.fill();
+
   }
 
-  cameraCtx.fillStyle = "#b5c7e6";
-  cameraCtx.font = "11px monospace";
-  cameraCtx.fillText("CCD SIMULATION", 14, 24);
-  cameraCtx.fillText(`TARGET: ${telescope.target}`, 14, 40);
+
+  /* Object glow */
+
+  cameraCtx.beginPath();
+
+  cameraCtx.arc(
+    width / 2,
+    height / 2,
+    30,
+    0,
+    Math.PI * 2
+  );
+
+  cameraCtx.fillStyle =
+    "rgba(150,180,255,.12)";
+
+  cameraCtx.fill();
+
+
+  /* HUD */
+
+  cameraCtx.fillStyle =
+    "#a8bad3";
+
+  cameraCtx.font =
+    "10px monospace";
+
+  cameraCtx.fillText(
+    "REZ CCD SENSOR",
+    14,
+    22
+  );
+
+  cameraCtx.fillText(
+    "TARGET: " + telescope.target,
+    14,
+    38
+  );
+
+  cameraCtx.fillText(
+    "EXPOSURE: 2.5s",
+    14,
+    54
+  );
+
 }
+
+
+/* =========================================================
+   DISPLAY
+   ========================================================= */
 
 function updateDisplay() {
-  document.getElementById("ra").textContent =
-    telescope.ra.toFixed(4) + "h";
 
-  const sign = telescope.dec >= 0 ? "+" : "";
+  document.getElementById("ra").textContent =
+    formatRA(telescope.ra);
 
   document.getElementById("dec").textContent =
-    sign + telescope.dec.toFixed(2) + "°";
+    formatDEC(telescope.dec);
 
   document.getElementById("az").textContent =
-    telescope.az.toFixed(1) + "°";
+    telescope.az.toFixed(2) + "°";
 
   document.getElementById("alt").textContent =
-    telescope.alt.toFixed(1) + "°";
+    telescope.alt.toFixed(2) + "°";
 
-  document.getElementById("trackingStatus").textContent =
-    telescope.tracking ? "ON" : "OFF";
+
+  document.getElementById(
+    "trackingStatus"
+  ).textContent =
+    telescope.tracking
+      ? "ON"
+      : "OFF";
+
+
+  document.getElementById(
+    "currentTarget"
+  ).textContent =
+    telescope.target;
+
+
+  document.getElementById(
+    "cameraTarget"
+  ).textContent =
+    "TARGET: " +
+    telescope.target;
 }
 
-function move(direction) {
-  const speed = .15;
 
-  if (direction === "up") telescope.alt += speed;
-  if (direction === "down") telescope.alt -= speed;
-  if (direction === "left") telescope.az -= speed;
-  if (direction === "right") telescope.az += speed;
+function formatRA(hours) {
 
-  telescope.alt = Math.max(-90, Math.min(90, telescope.alt));
+  let h = Math.floor(hours);
 
-  if (telescope.az < 0) telescope.az += 360;
-  if (telescope.az >= 360) telescope.az -= 360;
+  let minutes =
+    Math.floor((hours - h) * 60);
 
-  updateDisplay();
-  drawSky();
+  let seconds =
+    ((hours - h) * 60 - minutes) * 60;
+
+  return (
+    String(h).padStart(2, "0") +
+    "h " +
+    String(minutes).padStart(2, "0") +
+    "m " +
+    seconds.toFixed(1).padStart(4, "0") +
+    "s"
+  );
 }
 
-function stopTelescope() {
-  telescope.tracking = false;
-  updateDisplay();
+
+function formatDEC(value) {
+
+  const sign =
+    value >= 0 ? "+" : "-";
+
+  const absolute =
+    Math.abs(value);
+
+  const degrees =
+    Math.floor(absolute);
+
+  const minutes =
+    Math.floor(
+      (absolute - degrees) * 60
+    );
+
+  const seconds =
+    (
+      ((absolute - degrees) * 60)
+      - minutes
+    ) * 60;
+
+  return (
+    sign +
+    String(degrees).padStart(2, "0") +
+    "° " +
+    String(minutes).padStart(2, "0") +
+    "′ " +
+    seconds.toFixed(1) +
+    "″"
+  );
 }
 
-function tracking() {
-  telescope.tracking = !telescope.tracking;
-  updateDisplay();
-}
 
-function gotoObject(object) {
-  const targets = {
-    Moon: {
-      ra: 14.2,
-      dec: -12.1,
-      az: 130,
-      alt: 52
-    },
+/* =========================================================
+   TELESCOPE MOVEMENT
+   ========================================================= */
 
-    Mars: {
-      ra: 6.8,
-      dec: 23.4,
-      az: 210,
-      alt: 38
-    },
+function moveTelescope(direction) {
 
-    Jupiter: {
-      ra: 2.1,
-      dec: 11.8,
-      az: 265,
-      alt: 47
-    },
+  telescope.moving = true;
 
-    Andromeda: {
-      ra: .7,
-      dec: 41.3,
-      az: 82,
-      alt: 61
-    }
-  };
+  const speed = 0.35;
 
-  const target = targets[object];
 
-  if (!target) return;
+  if (direction === "up") {
 
-  telescope.ra = target.ra;
-  telescope.dec = target.dec;
-  telescope.az = target.az;
-  telescope.alt = target.alt;
-  telescope.target = object;
+    telescope.alt += speed;
 
-  updateDisplay();
-  drawSky();
-}
-
-function updateClock() {
-  const now = new Date();
-
-  document.getElementById("skyTime").textContent =
-    now.toLocaleTimeString();
-}
-
-function loop() {
-  if (telescope.tracking) {
-    telescope.ra += .00005;
-
-    if (telescope.ra >= 24) {
-      telescope.ra = 0;
-    }
-
-    updateDisplay();
   }
 
-  drawSky();
-  drawCamera();
-  updateClock();
+  if (direction === "down") {
 
-  requestAnimationFrame(loop);
+    telescope.alt -= speed;
+
+  }
+
+  if (direction === "left") {
+
+    telescope.az -= speed;
+
+  }
+
+  if (direction === "right") {
+
+    telescope.az += speed;
+
+  }
+
+
+  telescope.alt =
+    Math.max(
+      -90,
+      Math.min(
+        90,
+        telescope.alt
+      )
+    );
+
+
+  if (telescope.az < 0) {
+
+    telescope.az += 360;
+
+  }
+
+  if (telescope.az >= 360) {
+
+    telescope.az -= 360;
+
+  }
+
+
+  updateDisplay();
+
 }
 
-window.addEventListener("resize", () => {
-  resizeCanvas();
-  createStars();
-});
+
+function stopTelescope() {
+
+  telescope.moving = false;
+
+  telescope.tracking = false;
+
+  updateDisplay();
+
+}
+
+
+/* =========================================================
+   TRACKING
+   ========================================================= */
+
+function toggleTracking() {
+
+  telescope.tracking =
+    !telescope.tracking;
+
+  updateDisplay();
+
+}
+
+
+/* =========================================================
+   GOTO
+   ========================================================= */
+
+function gotoObject(id) {
+
+  const object =
+    getObjectById(id);
+
+  if (!object) return;
+
+
+  telescope.target =
+    object.name;
+
+  telescope.ra =
+    object.ra;
+
+  telescope.dec =
+    object.dec;
+
+  telescope.az =
+    object.az;
+
+  telescope.alt =
+    object.alt;
+
+
+  updateDisplay();
+
+}
+
+
+/* =========================================================
+   OBJECT LIST
+   ========================================================= */
+
+function renderObjects(list) {
+
+  const container =
+    document.getElementById(
+      "objectList"
+    );
+
+  container.innerHTML = "";
+
+
+  list.forEach(object => {
+
+    const item =
+      document.createElement("div");
+
+    item.className =
+      "object-item";
+
+
+    item.innerHTML = `
+
+      <div>
+        <div class="object-name">
+          ${object.name}
+        </div>
+
+        <div class="object-type">
+          ${object.type}
+          • Mag ${object.magnitude}
+        </div>
+      </div>
+
+      <button class="goto">
+        GOTO
+      </button>
+
+    `;
+
+
+    item
+      .querySelector(".goto")
+      .addEventListener(
+        "click",
+        event => {
+
+          event.stopPropagation();
+
+          gotoObject(object.id);
+
+        }
+      );
+
+
+    item.addEventListener(
+      "click",
+      () => {
+
+        gotoObject(object.id);
+
+      }
+    );
+
+
+    container.appendChild(item);
+
+  });
+
+}
+
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
+const search =
+  document.getElementById(
+    "objectSearch"
+  );
+
+
+search.addEventListener(
+  "input",
+  () => {
+
+    const results =
+      searchObjects(
+        search.value
+      );
+
+    renderObjects(results);
+
+  }
+);
+
+
+/* =========================================================
+   CLOCK
+   ========================================================= */
+
+function updateClock() {
+
+  const now =
+    new Date();
+
+  document.getElementById(
+    "skyTime"
+  ).textContent =
+    now.toLocaleTimeString();
+
+}
+
+
+/* =========================================================
+   TRACKING ENGINE
+   ========================================================= */
+
+function trackingEngine() {
+
+  if (telescope.tracking) {
+
+    telescope.ra += 0.00003;
+
+    if (telescope.ra >= 24) {
+
+      telescope.ra = 0;
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   MAIN LOOP
+   ========================================================= */
+
+function mainLoop() {
+
+  trackingEngine();
+
+  updateDisplay();
+
+  drawSkyMap();
+
+  drawCamera();
+
+  updateClock();
+
+  animationFrame =
+    requestAnimationFrame(
+      mainLoop
+    );
+
+}
+
+
+/* =========================================================
+   INITIALIZATION
+   ========================================================= */
+
+window.addEventListener(
+  "resize",
+  () => {
+
+    resizeCanvas();
+
+    generateStars();
+
+  }
+);
+
 
 resizeCanvas();
-createStars();
+
+generateStars();
+
+renderObjects(
+  CELESTIAL_OBJECTS
+);
+
 updateDisplay();
-loop();
+
+mainLoop();
 ```
